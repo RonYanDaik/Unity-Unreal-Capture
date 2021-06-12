@@ -1,6 +1,6 @@
-# Unity Capture
+# Unity\Unreal Capture
 
-![Unity\Unreal Capture and OBS](https://raw.githubusercontent.com/schellingb/UnityCapture/master/README.png)
+![Unity\Unreal Capture and OBS](https://user-images.githubusercontent.com/3350340/121784048-56781d00-cbba-11eb-8852-d766000baaa1.png)
 
 ## Overview
 
@@ -56,10 +56,10 @@ and the 'MultiCam' script used by it.
 If you want to capture a custom texture (generated texture, a video, another webcam feed or a static image) you
 can refer to the 'UnityCaptureTextureExample' scene and the 'CaptureTexture' script used by it.
 
-## Setup in your Unity project
+## Setup in your UE4 project
 
 Check Unreal Demo.
-Copy files from Unreal demo directly to your project. 
+Copy files from Unreal demo directly to your project. Create render target texture. Make sure your texture is same resolution as picture is captured in OBS. Add custom capture scene component (look at the example class).
 
 ### Settings
 
