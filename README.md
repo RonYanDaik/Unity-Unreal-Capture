@@ -1,6 +1,6 @@
 # Unity Capture
 
-![Unity\Unreal Capture and OBS](https://raw.githubusercontent.com/schellingb/UnityCapture/master/README.png)
+![Unity\Unreal Capture and OBS](https://user-images.githubusercontent.com/3350340/121784048-56781d00-cbba-11eb-8852-d766000baaa1.png)
 
 ## Overview
 
@@ -42,7 +42,7 @@ If you see a message about matching rendering and display resolutions, use the r
 the 'Game' tab in Unity to set a fixed resolution to match the capture output.
 
 
-## Setup in your Unity project
+## Setup in your UE4 project
 
 Just copy the [UnityCapture asset directory from the included sample project](UnityCaptureSample/Assets/UnityCapture)
 into your own project and then add the 'Unity Capture' behavior to your camera at the bottom.
