@@ -1,4 +1,4 @@
-# Unity Capture
+# Unity\Unreal Capture
 
 ![Unity\Unreal Capture and OBS](https://user-images.githubusercontent.com/3350340/121784048-56781d00-cbba-11eb-8852-d766000baaa1.png)
 
