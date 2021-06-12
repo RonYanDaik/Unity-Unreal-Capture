@@ -32,6 +32,7 @@
 #include <cguid.h>
 #include <strsafe.h>
 #include <math.h>
+#include <string>
 
 #define CaptureSourceName L"Unity Video Capture"
 
@@ -70,13 +71,15 @@ static struct { int width, height; } _media[] =
 	{ 2560, 1600 }, //16:10
 	{ 1680, 1050 }, //16:10
 	{ 1440,  900 }, //16:10
+	{ 1024, 1024 }, //16:10
+	
 	{    0,    0 }, //This slot is used for custom resolutions if requested by the target application
 };
 
 //Error draw modes (what to display on screen in case of errors/warnings)
 enum EErrorDrawCase { EDC_ResolutionMismatch, EDC_UnityNeverStarted, EDC_UnitySendingStopped, _EDC_MAX };
-enum EErrorDrawMode { EDM_GREENKEY, EDM_BLUEPINK, EDM_GREENYELLOW, EDM_BLACK };
-static EErrorDrawMode ErrorDrawModes[_EDC_MAX] = { EDM_BLUEPINK, EDM_GREENYELLOW, EDM_GREENKEY };
+enum EErrorDrawMode { EDM_GREENKEY, EDM_BLUEPINK, EDM_GREENYELLOW, EDM_BLACK, EDM_TRANSPARENT, EDM_BLACK_TEXT };
+static EErrorDrawMode ErrorDrawModes[_EDC_MAX] = { EDM_BLUEPINK, EDM_GREENYELLOW, EDM_BLACK_TEXT };
 static wchar_t* ErrorDrawModeNames[] = { L"Green Key (RGB #00FE00)", L"Blue/Pink Pattern", L"Green/Yellow Pattern", L"Fill Black" };
 static bool OutputFrameRate = false;
 
@@ -142,8 +145,8 @@ private:
 		{
 			case SharedImageMemory::RECEIVERES_CAPTUREINACTIVE:{
 				//Show color pattern indicating that Unity is not sending frame data yet
-				char DisplayString[128], *DisplayStrings[] = { DisplayString };
-				int DisplayStringLens[] = { sprintf_s(DisplayString, sizeof(DisplayString), "Unity has not started sending image data (Capture Device #%d)", 1+m_pReceiver->GetCapNum()) };
+				char DisplayString[256], *DisplayStrings[] = { DisplayString };
+				int DisplayStringLens[] = { sprintf_s(DisplayString, sizeof(DisplayString), "(v3) Unity/Unreal has not started sending image data (Capture Device #%d) bit cnt: %d bufBPP %d", 1+m_pReceiver->GetCapNum(),pvi->bmiHeader.biBitCount,State.BufBPP) };
 				FillErrorPattern(ErrorDrawModes[EDC_UnityNeverStarted], &State, 1, DisplayStrings, DisplayStringLens, m_llFrame);
 				Sleep((DWORD)(m_avgTimePerFrame / 10000 - 1)); //just wait a bit until capturing next frame
 				break;}
@@ -155,8 +158,8 @@ private:
 			case SharedImageMemory::RECEIVERES_OLDFRAME:{
 				if (++m_llFrameMissCount < m_llFrameMissMax) break;
 				//Show color pattern when received more than X frames without new image (probably Unity stopped sending data)
-				char DisplayString[] = "Unity has stopped sending image data", *DisplayStrings[] = { DisplayString };
-				int DisplayStringLens[] = { sizeof(DisplayString) - 1 };
+				char DisplayString[128], *DisplayStrings[] = { DisplayString };
+				int DisplayStringLens[] = { sprintf_s(DisplayString, sizeof(DisplayString), "(v3) Signal has stopped sending image data. [bit cnt: %d bufBPP %d]", pvi->bmiHeader.biBitCount,State.BufBPP) };
 				FillErrorPattern(ErrorDrawModes[EDC_UnitySendingStopped], &State, 1, DisplayStrings, DisplayStringLens, m_llFrame);
 				break;}
 		}
@@ -166,7 +169,7 @@ private:
 
 	struct ProcessJob
 	{
-		enum EType { JOB_NONE, JOB_RGBA8toBGR8, JOB_RGBA8toBGRA8, JOB_RGBA16toBGR8, JOB_RGBA16toBGRA8, JOB_BGR_RESIZE_LINEAR, JOB_BGRA_RESIZE_LINEAR, JOB_BGR_MIRROR_HORIZONTAL, JOB_BGRA_MIRROR_HORIZONTAL } Type;
+		enum EType { JOB_NONE, JOB_RGBA8toBGR8, JOB_RGBA8toBGRA8, JOB_RGBA16toBGR8, JOB_RGBA16toBGRA8, JOB_BGR_RESIZE_LINEAR, JOB_BGRA_RESIZE_LINEAR, JOB_BGR_MIRROR_HORIZONTAL, JOB_BGRA_MIRROR_HORIZONTAL, JOB_BGR_SKIP, JOB_BGR_SKIPA } Type;
 		const void *BufIn; void *BufOut;
 		size_t Width, RowStart, RowEnd, RGBAInStride, ResizeToHeight, ResizeFromWidth, ResizeFromHeight;
 		const uint8_t* RGBA16Table;
@@ -183,6 +186,14 @@ private:
 			else if (Type == JOB_BGRA_RESIZE_LINEAR)     BGRAResizeLinear();
 			else if (Type == JOB_BGR_MIRROR_HORIZONTAL)  BGRMirrorHorizontal();
 			else if (Type == JOB_BGRA_MIRROR_HORIZONTAL) BGRAMirrorHorizontal();
+			else if (Type == JOB_BGR_SKIP)
+			{
+				BGRA8toBGRA8();
+			}
+			else if (Type == JOB_BGR_SKIPA)
+			{
+				BGRA8toBGRA8Inv();
+			}
 		}
 
 		void RGBA8toBGR8()
@@ -220,7 +231,73 @@ private:
 			uint32_t FinalPixel = _byteswap_ulong(*src) >> 8;
 			memcpy(dst, &FinalPixel, 3);
 		}
-
+		void BGRA8toBGRA8()
+		{
+			#define RGBATOBGRA(x) ((x))
+			const uint32_t *src = (const uint32_t*)BufIn + (RowStart * RGBAInStride);
+			uint32_t *dst = (uint32_t*)BufOut + (RowStart * Width), *dstEnd = (uint32_t*)BufOut + (RowEnd * Width);
+			if (RGBAInStride != Width)
+			{
+				//Handle a case where the texture pitch does have a gap on the right side
+				const uint32_t *srcEnd = (const uint32_t*)BufIn + ((RowEnd) * RGBAInStride);
+				for (size_t srcStride = RGBAInStride, iMax = Width; src != srcEnd; src += srcStride)
+					for (size_t i = 0; i != iMax; i++, dst++)
+						*dst = RGBATOBGRA(src[i]);
+			}
+			else
+			{
+				//The fastest (implemented) path to convert from RGBA to BGR
+				const uint32_t *srcEnd8 = src + (((RowEnd-RowStart)*Width)&~7), *srcEnd1 = src + ((RowEnd-RowStart)*Width);
+				for (; src != srcEnd8; dst += 8, src += 8)
+				{
+					dst[0] = RGBATOBGRA(src[0]);
+					dst[1] = RGBATOBGRA(src[1]);
+					dst[2] = RGBATOBGRA(src[2]);
+					dst[3] = RGBATOBGRA(src[3]);
+					dst[4] = RGBATOBGRA(src[4]);
+					dst[5] = RGBATOBGRA(src[5]);
+					dst[6] = RGBATOBGRA(src[6]);
+					dst[7] = RGBATOBGRA(src[7]);
+				}
+				for (; src != srcEnd1; dst++, src++)
+					*dst = RGBATOBGRA(*src);
+			}
+			#undef RGBATOBGRA
+		}
+		void BGRA8toBGRA8Inv()
+		{
+			//|(x&0x00FFFFFF) (x&0xFF000000)
+			#define BGRATOBGRA(x) (((~x)&0xFF000000)|(x&0x00FFFFFF))
+			const uint32_t *src = (const uint32_t*)BufIn + (RowStart * RGBAInStride);
+			uint32_t *dst = (uint32_t*)BufOut + (RowStart * Width), *dstEnd = (uint32_t*)BufOut + (RowEnd * Width);
+			if (RGBAInStride != Width)
+			{
+				//Handle a case where the texture pitch does have a gap on the right side
+				const uint32_t *srcEnd = (const uint32_t*)BufIn + ((RowEnd) * RGBAInStride);
+				for (size_t srcStride = RGBAInStride, iMax = Width; src != srcEnd; src += srcStride)
+					for (size_t i = 0; i != iMax; i++, dst++)
+						*dst = BGRATOBGRA(src[i]);
+			}
+			else
+			{
+				//The fastest (implemented) path to convert from RGBA to BGR
+				const uint32_t *srcEnd8 = src + (((RowEnd-RowStart)*Width)&~7), *srcEnd1 = src + ((RowEnd-RowStart)*Width);
+				for (; src != srcEnd8; dst += 8, src += 8)
+				{
+					dst[0] = BGRATOBGRA(src[0]);
+					dst[1] = BGRATOBGRA(src[1]);
+					dst[2] = BGRATOBGRA(src[2]);
+					dst[3] = BGRATOBGRA(src[3]);
+					dst[4] = BGRATOBGRA(src[4]);
+					dst[5] = BGRATOBGRA(src[5]);
+					dst[6] = BGRATOBGRA(src[6]);
+					dst[7] = BGRATOBGRA(src[7]);
+				}
+				for (; src != srcEnd1; dst++, src++)
+					*dst = BGRATOBGRA(*src);
+			}
+			#undef RGBATOBGRA
+		}
 		void RGBA8toBGRA8()
 		{
 			#define RGBATOBGRA(x) ((x&0xFF00FF00)|((x&0x00FF0000)>>16)|((x&0x000000FF)<<16))
@@ -486,7 +563,7 @@ private:
 			}
 		}
 
-		if (Format != SharedImageMemory::FORMAT_UINT8 && (!State->Owner->m_RGBA16Table || State->Owner->m_RGBA16TableFormat != Format))
+		if (Format != SharedImageMemory::FORMAT_UINT8 && Format != SharedImageMemory::FORMAT_UINT8_BGR &&  (!State->Owner->m_RGBA16Table || State->Owner->m_RGBA16TableFormat != Format))
 		{
 			//Build a 64k table that maps 16 bit float values (either linear SRGB or gamma RGB) to 8 bit color values
 			const bool SRGB = (Format == SharedImageMemory::FORMAT_FP16_LINEAR);
@@ -504,8 +581,12 @@ private:
 
 		//Multi-threaded conversion of RGBA source to 8-bit BGR format while also eliminating possible row gaps (when stride != width)
 		ProcessJob Job;
-		if (State->BufBPP == 4) Job.Type = (Format == SharedImageMemory::FORMAT_UINT8 ? ProcessJob::JOB_RGBA8toBGRA8 : ProcessJob::JOB_RGBA16toBGRA8);
-		else                    Job.Type = (Format == SharedImageMemory::FORMAT_UINT8 ? ProcessJob::JOB_RGBA8toBGR8  : ProcessJob::JOB_RGBA16toBGR8 );
+		if (State->BufBPP == 4) Job.Type = (Format == SharedImageMemory::FORMAT_UINT8 ? 
+			ProcessJob::JOB_RGBA8toBGRA8 : (Format == SharedImageMemory::FORMAT_UINT8_BGR ? ProcessJob::JOB_BGR_SKIPA : 
+				ProcessJob::JOB_RGBA16toBGRA8));
+		else                    Job.Type = (Format == SharedImageMemory::FORMAT_UINT8 ? 
+			ProcessJob::JOB_RGBA8toBGR8  : (Format == SharedImageMemory::FORMAT_UINT8_BGR?ProcessJob::JOB_BGR_SKIP : 
+				ProcessJob::JOB_RGBA16toBGR8) );
 		Job.BufIn = InBuf, Job.BufOut = (NeedResize ? State->Owner->m_pUnscaledBuf : State->Buf);
 		Job.Width = InWidth, Job.RowStart = 0, Job.RowEnd = InHeight, Job.RGBAInStride = InStride;
 		Job.RGBA16Table = State->Owner->m_RGBA16Table;
@@ -530,7 +611,9 @@ private:
 			State->Owner->m_ProcessWorkers.StartNewJob(Job);
 		}
 	}
-
+	#define RGBA(r,g,b,a)          ((COLORREF)(((BYTE)(r)|((WORD)((BYTE)(g))<<8))|(((DWORD)(BYTE)(b))<<16)|(((DWORD)(BYTE)(a))<<24)))
+	//---------------------------------------------------------------------------
+	// Pattern That Shown In OBS when signal is missong
 	static void FillErrorPattern(EErrorDrawMode edm, ProcessState* State, int LineCount = 0, char** LineStrings = NULL, int* LineLengths = NULL, LONGLONG FrameNumber = -1)
 	{
 		if (FrameNumber >= 0 && FrameNumber < 5) edm = EDM_BLACK; //show errors as just black during the first 5 frames (when starting)
@@ -541,8 +624,9 @@ private:
 			case EDM_GREENYELLOW: while (p != pEnd) { *(p++) = 0x00; *(p++) = 0xFF; *(p++) = (size_t)p%0xFF; p += SkipCount; } break; //Green/yellow color pattern (BGR colors)
 			case EDM_BLUEPINK:    while (p != pEnd) { *(p++) = 0xFF; *(p++) = 0x00; *(p++) = (size_t)p%0xFF; p += SkipCount; } break; //Blue/pink color pattern (BGR colors)
 			case EDM_BLACK:       ZeroMemory(State->Buf, (State->BufWidth * State->BufHeight * State->BufBPP)); break; //Filled with black
+			case EDM_BLACK_TEXT:  ZeroMemory(State->Buf, (State->BufWidth * State->BufHeight * State->BufBPP)); break; //Filled with black
 		}
-
+		
 		if (LineCount && edm != EDM_BLACK && edm != EDM_GREENKEY && State->BufHeight >= LineCount * 20)
 		{
 			void* pTextBuf;
@@ -551,8 +635,11 @@ private:
 			TextBMI.bmiHeader.biHeight = LineCount * 20;
 			HBITMAP TextHBitmap = CreateDIBSection(TextDC, &TextBMI, DIB_RGB_COLORS, &pTextBuf, NULL, 0);
 			SelectObject(TextDC, TextHBitmap);
-			SetBkMode(TextDC, TRANSPARENT);
-			SetTextColor(TextDC, RGB(255, 0, 0));
+			SetBkMode(TextDC, OPAQUE);
+			SetDCBrushColor(TextDC, 0xFfff00FF);
+			SetDCPenColor(TextDC,RGB(0,0,255));
+			Rectangle( TextDC,   0,   0,   State->BufWidth,   LineCount * 20);
+			SetTextColor(TextDC, RGB(255,0,0));
 			for (int i = 0; i < LineCount; i++) TextOutA(TextDC, 10,  i * 20, LineStrings[i], LineLengths[i]);
 			memcpy(State->Buf + ((State->BufHeight - TextBMI.bmiHeader.biHeight) / 2) * State->BufWidth * State->BufBPP, pTextBuf, TextBMI.bmiHeader.biHeight * State->BufWidth * State->BufBPP);
 			DeleteObject(TextHBitmap);
@@ -560,8 +647,12 @@ private:
 		}
 		if (State->BufBPP == 4)
 		{
-			BYTE FillAlpha = (edm == EDM_GREENKEY ? 0x0 : (edm == EDM_BLACK ? 0x0 : 0xA0));
-			for (p = State->Buf; p != pEnd; p += 4) p[3] = FillAlpha;
+			//MessageBoxA(0, "4", "BufBPP", NULL);
+			BYTE FillAlpha = (edm == EDM_GREENKEY ? 0x0 : ((edm == EDM_BLACK ) ? 0x0 : 0xA0));
+			//BYTE *pSkip = State->Buf + ((State->BufHeight - (LineCount * 20)) / 2) * State->BufWidth * State->BufBPP;
+			for (p = State->Buf; p != pEnd; p += 4) 
+				//if(p<pSkip) FillAlpha = 0x0;
+					p[3] = FillAlpha;
 		}
 	}
 

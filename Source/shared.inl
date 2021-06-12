@@ -40,7 +40,7 @@ struct SharedImageMemory
 	int32_t GetCapNum() { return m_CapNum; }
 	enum { MAX_CAPNUM = ('z' - '0') }; //see Open() for why this number
 	enum { RECEIVE_MAX_WAIT = 200 }; //How many milliseconds to wait for new frame
-	enum EFormat { FORMAT_UINT8, FORMAT_FP16_GAMMA, FORMAT_FP16_LINEAR };
+	enum EFormat { FORMAT_UINT8, FORMAT_FP16_GAMMA, FORMAT_FP16_LINEAR, FORMAT_UINT8_BGR };
 	enum EResizeMode { RESIZEMODE_DISABLED = 0, RESIZEMODE_LINEAR = 1 };
 	enum EMirrorMode { MIRRORMODE_DISABLED = 0, MIRRORMODE_HORIZONTALLY = 1 };
 	enum EReceiveResult { RECEIVERES_CAPTUREINACTIVE, RECEIVERES_NEWFRAME, RECEIVERES_OLDFRAME };
@@ -65,8 +65,38 @@ struct SharedImageMemory
 	{
 		return Open(false);
 	}
-
+	//unrealCam version
 	enum ESendResult { SENDRES_TOOLARGE, SENDRES_WARN_FRAMESKIP, SENDRES_OK };
+	ESendResult SendUnrl(LONGLONG time, int width, int height, const unsigned char* buffer)
+	{
+		/*if(buffer == NULL) 
+			return E_POINTER;
+
+		HRESULT hr = Open();
+		if (hr != S_OK) 
+			return hr;
+
+		{
+			WaitForSingleObject(m_hMutex, INFINITE); //lock mutex
+			int32_t imageSize = width * height*3 ;
+			int32_t bufSize = imageSize + sizeof(BufferHeader);
+			if(m_pSharedBuf->maxSize < bufSize) {
+				return E_UNEXPECTED;
+			}
+			m_pSharedBuf->width = width;
+			m_pSharedBuf->height = height;
+			BufferHeader* pDesc = (BufferHeader*) m_pSharedBuf->bufferPtr;
+			pDesc->timestamp = time;
+			pDesc->width = width;
+			pDesc->height = height;
+			unsigned char* pSharedData = m_pSharedBuf->bufferPtr + sizeof(BufferHeader);
+			memcpy(pSharedData, buffer, imageSize);
+			ReleaseMutex(m_hMutex); //unlock mutex
+		}
+		SetEvent(m_hSentFrameEvent);*/
+		return SENDRES_OK;
+	}
+	
 	ESendResult Send(int width, int height, int stride, DWORD DataSize, EFormat format, EResizeMode resizemode, EMirrorMode mirrormode, int timeout, const uint8_t* buffer)
 	{
 		UCASSERT(buffer);
