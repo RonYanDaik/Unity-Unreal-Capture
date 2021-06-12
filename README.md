@@ -42,7 +42,7 @@ If you see a message about matching rendering and display resolutions, use the r
 the 'Game' tab in Unity to set a fixed resolution to match the capture output.
 
 
-## Setup in your UE4 project
+## Setup in your Unity project
 
 Just copy the [UnityCapture asset directory from the included sample project](UnityCaptureSample/Assets/UnityCapture)
 into your own project and then add the 'Unity Capture' behavior to your camera at the bottom.
@@ -56,10 +56,10 @@ and the 'MultiCam' script used by it.
 If you want to capture a custom texture (generated texture, a video, another webcam feed or a static image) you
 can refer to the 'UnityCaptureTextureExample' scene and the 'CaptureTexture' script used by it.
 
-## Setup in your Unity project
+## Setup in your UE4 project
 
 Check Unreal Demo.
-Copy files from Unreal demo directly to your project. 
+Copy files from Unreal demo directly to your project. Create render target texture. Make sure your texture is same resolution as picture is captured in OBS. Add custom capture scene component (look at the example class).
 
 ### Settings
 
