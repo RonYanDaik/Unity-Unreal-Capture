@@ -7,7 +7,7 @@
 Unity\Unreal Capture is a Windows DirectShow Filter that allows you to stream a rendered camera directly to another application.  
 In more simple terms, it essentially makes Unity simulate a web cam device on Windows that shows a rendered camera.
 
-This project is based on UnityCapture  (//github.com/schellingb/UnityCapture) with added features and big performance
+This project is based on [UnityCapture](https://github.com/schellingb/UnityCapture) with added features and big performance
 improvements. It supports lag-free 1080p at 60 FPS on moderate PCs and can handle 4K resolutions on a faster PC.
 It also supports capturing multiple cameras and alpha channel (transparency) in receiving applications that
 support it (like [OBS](https://obsproject.com/)).
