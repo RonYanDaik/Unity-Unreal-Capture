@@ -42,8 +42,7 @@ void UVirtualSceneCaptureMComponent2D::TickComponent(float DeltaTime, ELevelTick
 	
 	
 	;
-	if(TextureTarget //&& D3DDevice
-		)
+	if(TextureTarget )
 	{
 		ENQUEUE_RENDER_COMMAND(SceneDrawCompletion)(
 		[This,ptrDLLt](FRHICommandListImmediate& RHICmdList)
@@ -51,16 +50,9 @@ void UVirtualSceneCaptureMComponent2D::TickComponent(float DeltaTime, ELevelTick
 			This-> D3DDevice = (ID3D11Device*) RHIGetNativeDevice();
 			This->ptrDLL->SetDeviceDLL(This->D3DDevice,0);
 		
-			/*int size = TextureTarget->SizeX * TextureTarget->SizeY;
-			if(!data || (allocated_size<(size*3)))
-			{
-				allocated_size = size * 3;
-				if(data)
-					delete data;
-				
-				data = new UCHAR[size * 3];
-			}*/
+			/**/
 			ID3D11Texture2D* D3D11Texture;
+			//Raw colors (without post processing)
 			FRHITexture2D* Texture2D =This->TextureTarget->Resource->TextureRHI->GetTexture2D();
 			D3D11Texture = (ID3D11Texture2D*)Texture2D->GetNativeResource();
 			int res = This->ptrDLL->SendTexture2DLL(D3D11Texture,0,false,false);
@@ -72,7 +64,17 @@ void UVirtualSceneCaptureMComponent2D::TickComponent(float DeltaTime, ELevelTick
 		
 		FTextureRenderTarget2DResource* textureResource = (FTextureRenderTarget2DResource*)TextureTarget->Resource;
 		TArray<FColor> ColorBuffer;
-		/*if (textureResource->ReadPixels(ColorBuffer))
+		/*
+		int size = TextureTarget->SizeX * TextureTarget->SizeY;
+		if(!data || (allocated_size<(size*3)))
+			{
+				allocated_size = size * 3;
+				if(data)
+					delete data;
+				
+				data = new UCHAR[size * 3];
+			}
+		if (textureResource->ReadPixels(ColorBuffer))
 		{
 		
 			for (int32 i = 0; i < size; i++)
@@ -88,11 +90,6 @@ void UVirtualSceneCaptureMComponent2D::TickComponent(float DeltaTime, ELevelTick
 
 			RenderRequest* This = this;
 
-ENQUEUE_RENDER_COMMAND(SceneDrawCompletion)(
-[This](FRHICommandListImmediate& RHICmdList)
-{
-    This->ExecuteTask();
-});
 		}*/
 		
 	}
