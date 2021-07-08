@@ -60,6 +60,7 @@ can refer to the 'UnityCaptureTextureExample' scene and the 'CaptureTexture' scr
 
 Check Unreal Demo.
 Copy files from Unreal demo directly to your project. Create render target texture. Make sure your texture is same resolution as picture is captured in OBS. Add custom capture scene component (look at the example class).
+Project mast be using DX11.
 
 ### Settings
 
