@@ -63,7 +63,7 @@ Copy files from Unreal demo directly to your project. Create render target textu
 
 ### Settings
 
-There are a few settings for the 'Unity Capture' behavior.
+There are a few settings for the 'Unreal\Unity Capture' behavior.
 
 - 'Capture Device': Set the capture device filter number (only relevant when multiple capture devices were [installed](#installation))
 - 'Timeout': Sets how many milliseconds to wait for a new frame until sending is considered to be stopped  
@@ -80,7 +80,7 @@ There are a few settings for the 'Unity Capture' behavior.
 ### Possible errors/warnings
 
 - Warning: "Capture device did skip a frame read, capture frame rate will not match render frame rate."  
-  Output when a frame rendered by Unity was never displayed in the target capture application due
+  Output when a frame rendered by Unreal\Unity was never displayed in the target capture application due
   to performance problems or target application being slow.
 - Warning: "Capture device is inactive"  
   If the target capture application has not been started yet.
